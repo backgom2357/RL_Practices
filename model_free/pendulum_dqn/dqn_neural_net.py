@@ -7,9 +7,9 @@ from tensorflow.keras.optimizers import Adam
 class DeepQNetwork(Model):
     def __init__(self, action_dim):
         super(DeepQNetwork, self).__init__()
-        self.d1 = Dense(64, activation=LeakyReLU(), kernel_initializer=tf.keras.initializers.he_uniform())
-        self.d2 = Dense(32, activation=LeakyReLU(), kernel_initializer=tf.keras.initializers.he_uniform())
-        self.d3 = Dense(16, activation=LeakyReLU(), kernel_initializer=tf.keras.initializers.he_uniform())
+        self.d1 = Dense(64, activation='relu')
+        self.d2 = Dense(32, activation='relu')
+        self.d3 = Dense(16, activation='relu')
         self.v_output = Dense(action_dim, activation='linear')
 
     def call(self, inputs):
@@ -34,15 +34,23 @@ class DQN(object):
 
         # create deep q network
         self.model = DeepQNetwork(self.action_dim)
+        self.theta = self.model.trainable_weights
 
         # set traning method
-        self.model.compile(optimizer=Adam(self.learning_rate), loss='mse')
+        self.optimizer = Adam(learning_rate)
 
     # update neural net with batch data
     def train_on_batch(self, states, td_targets):
         if self.final_exploration < self.initial_exploration:
             self.initial_exploration -= 1.0 / self.final_exploration_frame
-        return self.model.train_on_batch(states, td_targets)
+        with tf.GradientTape() as g:
+            q_values = self.model(states)
+            q_values = tf.reduce_sum(q_values, axis=1) / 3.  # calculate average q
+            loss = 0.5*((td_targets-q_values)**2)
+        g_theta = g.gradient(loss, self.theta)
+        g_theta = tf.clip_by_global_norm(g_theta, 10)
+        grad = zip(g_theta, self.theta)
+        self.optimizer.apply_gradients(grad)
 
     def get_action(self, state, is_test=False):
         if self.initial_exploration >= np.random.rand() and not is_test:

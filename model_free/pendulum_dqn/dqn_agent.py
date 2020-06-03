@@ -9,12 +9,12 @@ class DQNAgent(object):
     def __init__(self, env, is_test=False):
 
         # hyperparameter
-        self.BATCH_SIZE = 32
+        self.BATCH_SIZE = 124
         self.LEARNING_RATE = 0.001
         self.replay_memory_size = 20000
         self.replay_start_size = 1000
         self.discount_factor = 0.99
-        self.target_network_update_frequency = 5
+        self.target_network_update_frequency = 10
 
         # environment
         self.env = env
@@ -23,7 +23,7 @@ class DQNAgent(object):
         # action dimension
         self.action_dim = self.env.action_space.n
         # max position
-        self.max_position = self.env.min_position + self.env.max_position
+        self.max_position = self.env.min_position
 
         # replay memory
         self.replay_memory = ReplayMemory(self.replay_memory_size, self.state_dim)
@@ -37,7 +37,7 @@ class DQNAgent(object):
 
         self.save_mean_q_value = []
 
-        self.stop_train = 3
+        self.stop_train = 4
 
     def train(self, max_episode_num):
 
@@ -79,7 +79,7 @@ class DQNAgent(object):
                 if next_state[0, 0] > self.max_position:
                     self.max_position = next_state[0, 0]
                     reward = 10
-                if next_state[0, 0] >= 0.4:
+                if next_state[0, 0] >= 0.5:
                     reward += 10
 
                 # reshape
@@ -100,13 +100,12 @@ class DQNAgent(object):
 
                 # calculate target
                 for i in range(self.BATCH_SIZE):
-                    if dones[i]:
-                        targets[i] = rewards[i]
-                    else:
-                        # DQN
-                        targets[i] = rewards[i] + self.discount_factor * np.amax(next_target_q_value[i])
-                        # # DDQN
-                        # targets[i] = rewards[i] + self.discount_factor * np.array(tf.gather(next_target_q_value[i], [np.argmax(next_q_value[i])]), dtype=np.float32)
+                    # # DQN
+                    targets[i] = dones[i]*rewards[i]+(1-dones[i])*(rewards[i]+self.discount_factor * np.amax(next_target_q_value[i]))
+
+                    # DDQN
+                    # argmx_action = self.q.get_action(np.reshape(states[i], (1, self.state_dim)))
+                    # targets[i] = dones[i] * rewards[i] + (1-dones[i]) * (self.discount_factor * next_target_q_value[i][argmx_action])
 
                 # train
                 self.q.train_on_batch(states, targets)
@@ -119,7 +118,7 @@ class DQNAgent(object):
                     train_ep += 1
                     end_position = state[0, 0]
                     Q_value = self.q.model(state)
-                    print('Episode: {}, Reward: {}, End Position: {:.3f}, Epsilon: {:.3f}, Q-value: {}'.format(train_ep, episode_reward, end_position, self.q.initial_exploration, np.array(Q_value)))
+                    print('Episode: {}, Reward: {}, End Position: {:.3f}, Epsilon: {:.3f}, Q-value: {}'.format(train_ep, episode_reward, end_position, self.q.initial_exploration, np.mean(Q_value)))
                     self.save_epi_reward.append(episode_reward)
                     self.save_mean_q_value.append(np.mean(Q_value[0]))
 

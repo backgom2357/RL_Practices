@@ -27,10 +27,5 @@ class ReplayMemory(object):
             self.is_full = True
 
     def sample(self, batch_size):
-
-        if self.is_full:
-            indices = np.random.choice(self.replay_memory_size, batch_size)
-        else:
-            indices = np.random.choice(self.current, batch_size)
-
+        indices = self.is_full*np.random.choice(self.replay_memory_size, batch_size) + (1 - self.is_full)*np.random.choice(self.current, batch_size)
         return self.seqs[indices, ...], self.actions[indices], self.rewards[indices], self.next_seqs[indices, ...], self.dones[indices]
