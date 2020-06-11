@@ -1,5 +1,11 @@
 import gym
 from dqn_agent import Agent
+import tensorflow as tf
+
+physical_devices = tf.config.list_physical_devices('GPU')
+tf.config.experimental.set_memory_growth(
+    physical_devices[0], True
+)
 
 def main():
 
@@ -7,13 +13,9 @@ def main():
     env_name = 'Boxing-v0'
     env = gym.make(env_name)
 
-    agent = Agent(env, is_test=True)
+    agent = Agent(env)
 
-    # train
-    agent.test()
-
-    # # result
-    # agent.plot_result()
+    agent.test('./save_weights/dqn_boxing_400e.h5')
 
 if __name__ == "__main__":
     main()

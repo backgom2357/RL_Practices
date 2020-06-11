@@ -1,25 +1,35 @@
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Conv2D, Flatten, Dense, LeakyReLU
+from tensorflow.keras.layers import Conv2D, Flatten, Dense
 
 class DeepQNetwork(Model):
+
+    # Duel DQN
+
     def __init__(self, action_dim):
         super(DeepQNetwork, self).__init__()
-        self.conv1 = Conv2D(32, (8, 8), 4, activation=LeakyReLU())
-        self.conv2 = Conv2D(64, (4, 4), 2, activation=LeakyReLU())
-        self.conv3 = Conv2D(64, (4, 4), 1, activation='relu')
+        self.action_dim = action_dim
+        self.conv1 = Conv2D(32, (8, 8), 4, activation='relu')
+        self.conv2 = Conv2D(64, (4, 4), 2, activation='relu')
+        self.conv3 = Conv2D(64, (3, 3), 1, activation='relu')
         self.flatten = Flatten()
-        self.d1 = Dense(512, activation='relu')
-        self.out = Dense(action_dim)
+        self.full_connect_v = Dense(512, activation='relu')
+        self.full_connect_a = Dense(512, activation='relu')
+        self.d_v = Dense(1)
+        self.d_a = Dense(action_dim)
 
     def call(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.flatten(x)
-        x = self.d1(x)
-        return self.out(x)
+        v = self.full_connect_v(x)
+        a = self.full_connect_a(x)
+        v = self.d_v(v)
+        a = self.d_a(a)
+        output = v + (a - tf.reduce_mean(a))
+        return output
 
 class DQN(object):
     def __init__(self, action_dim):
@@ -42,14 +52,15 @@ class DQN(object):
         self.dqn_loss = tf.keras.losses.MeanSquaredError()
         self.dqn_optimizer = tf.optimizers.RMSprop(learning_rate=self.learning_rate, momentum=self.gradient_momentum)
 
-    def train(self, targets, seqs, actions):
+    def train(self, seqs, actions, targets):
         # epsilon decay
-        self.epsilon -= (self.initial_exploration + self.final_exploration)/self.final_exploration_frame
+        if self.epsilon > self.final_exploration:
+            self.epsilon -= (self.initial_exploration + self.final_exploration)/self.final_exploration_frame
         # update parameters
         with tf.GradientTape() as g:
-            q_value = self.model(seqs)
-            q_value_with_action = tf.gather(tf.reshape(q_value, [-1]), tf.range(0, q_value.shape[0]) * q_value.shape[1] + actions)
-            loss = self.dqn_loss(targets, q_value_with_action)
+            q_values = self.model(seqs)
+            q_values_with_action = tf.reduce_sum(q_values * actions, axis=1)
+            loss = self.dqn_loss(targets, q_values_with_action)
         g_loss = g.gradient(loss, self.model.trainable_weights)
         self.dqn_optimizer.apply_gradients(zip(g_loss, self.model.trainable_weights))
 
