@@ -10,12 +10,12 @@ tf.config.experimental.set_memory_growth(
 def main():
 
     # environment
-    env_name = 'Boxing-v0'
+    env_name = 'Boxing-v4'
     env = gym.make(env_name)
 
     agent = Agent(env)
 
-    agent.test('./save_weights/dqn_boxing_400e.h5')
+    agent.test('./save_weights/dqn_boxing_400epi.h5')
 
 if __name__ == "__main__":
     main()

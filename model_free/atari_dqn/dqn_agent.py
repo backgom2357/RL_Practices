@@ -176,7 +176,7 @@ class Agent(object):
             # # render
             self.env.render()
             # get action
-            action = np.amax(self.q.model(seq))
+            action = np.argmax(self.q.model(seq)[0])
             # observe next frame
             observation, reward, done, info = self.env.step(action)
             # preprocess for next sequence
