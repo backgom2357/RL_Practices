@@ -12,10 +12,10 @@ class DQNAgent(object):
     def __init__(self, env, is_test=False):
 
         # hyperparameter
-        self.BATCH_SIZE = 64
+        self.BATCH_SIZE = 32
         self.LEARNING_RATE = 0.001
-        self.replay_memory_size = 100000
-        self.replay_start_size = 10000
+        self.replay_memory_size = 40000
+        self.replay_start_size = 5000
         self.discount_factor = 0.99
         self.target_network_update_frequency = 5
 
@@ -105,17 +105,26 @@ class DQNAgent(object):
 
                 states.append((self.replay_memory[random_index][0]))
                 actions.append((self.replay_memory[random_index][1]))
-                rewards.append(self.replay_memory[random_index][2])
-                next_states.append(self.replay_memory[random_index][3])
-                dones.append(self.replay_memory[random_index][4])
+                sampled_reward = self.replay_memory[random_index][2]
+                sampled_done = self.replay_memory[random_index][4]
+                sampled_next_state = self.replay_memory[random_index][3]
 
-                # calculate target
-                target = dones[-1] * rewards[-1] \
-                         + (1 - dones[-1]) * (rewards[-1] + self.discount_factor
-                                              * np.amax(self.target_q.model(next_states[-1])))
+                # argmax action from current q
+                argmax_action = np.argmax(self.q.model(sampled_next_state)[1])
+                argmax_action = tf.one_hot(argmax_action, self.action_dim)
+
+                target_v, target_a = self.target_q.model(sampled_next_state)
+                target_q = target_v + (target_a - tf.reduce_mean(target_a))
+
+                # Double dqn
+                target = sampled_done * sampled_reward \
+                         + (1 - sampled_done) * (sampled_reward + self.discount_factor
+                                                 * (np.dot(target_q, argmax_action)))
                 targets.append(target)
 
-                mean_q_value += np.mean(self.q.model(state))
+                v, a = self.q.model(state)
+                q = v + (a - tf.reduce_mean(a))
+                mean_q_value += np.mean(q)
 
                 if len(targets) == self.BATCH_SIZE:
 

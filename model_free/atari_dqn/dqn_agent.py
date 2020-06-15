@@ -115,7 +115,6 @@ class Agent(object):
 
                 mean_q_value += np.mean(self.q.model(seq))
 
-                # train for each 4 frames
                 if len(targets) == self.batch_size:
                     input_seqs = np.reshape(seqs,
                                             (self.batch_size, self.frame_size, self.frame_size,
@@ -183,13 +182,6 @@ class Agent(object):
             next_seq = np.append(self.preprocess(observation), seq[..., :3], axis=3)
             # store transition in replay memory
             seq = next_seq
-
-            if done:
-                train_ep += 1
-                print('Episode: {}, Reward: {}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep,
-                                                                                     episode_reward,
-                                                                                     self.q.epsilon,
-                                                                                     mean_q_value / frames))
 
     # graph episodes and rewards
     def plot_result(self):

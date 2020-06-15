@@ -10,14 +10,20 @@ class DeepQNetwork(Model):
         self.inputs = Input(shape=(1, state_dim))
         self.d1 = Dense(64, activation='relu')
         self.d2 = Dense(32, activation='relu')
-        self.d3 = Dense(16, activation='relu')
-        self.v_output = Dense(action_dim, activation='linear')
+        self.d3_v = Dense(16, activation='relu')
+        self.d3_a = Dense(16, activation='relu')
+        self.d_v = Dense(1)
+        self.d_a = Dense(action_dim)
 
     def call(self, x):
-        output = self.d1(x)
-        output = self.d2(output)
-        output = self.d3(output)
-        return self.v_output(output)
+        x = self.d1(x)
+        x = self.d2(x)
+        v = self.d3_v(x)
+        v = self.d_v(v)
+        a = self.d3_a(x)
+        a = self.d_a(a)
+        # output = v + (a - tf.reduce_mean(a))
+        return v, a
 
 class DQN(object):
     def __init__(self, state_dim, action_dim, learning_rate):
@@ -45,7 +51,8 @@ class DQN(object):
         if self.final_exploration < self.initial_exploration:
             self.initial_exploration -= 1.0 / self.final_exploration_frame
         with tf.GradientTape() as g:
-            q_values = self.model(states)
+            v, a = self.model(states)
+            q_values = v + (a - tf.reduce_mean(a))
             q_values_with_actions = tf.reduce_sum(q_values * actions, axis=1)
             loss = 0.5*((td_targets-q_values_with_actions)**2)
         g_theta = g.gradient(loss, self.model.trainable_weights)
@@ -56,7 +63,7 @@ class DQN(object):
         if self.initial_exploration >= np.random.rand() and not is_test:
             return np.random.randint(self.action_dim)
         else:
-            return np.argmax(self.model(state)[0])
+            return np.argmax(self.model(state)[1])
 
 
     def save_weights(self, path):
