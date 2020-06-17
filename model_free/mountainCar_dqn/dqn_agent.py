@@ -14,8 +14,8 @@ class DQNAgent(object):
         # hyperparameter
         self.BATCH_SIZE = 32
         self.LEARNING_RATE = 0.001
-        self.replay_memory_size = 40000
-        self.replay_start_size = 5000
+        self.replay_memory_size = 100000
+        self.replay_start_size = 1000
         self.discount_factor = 0.99
         self.target_network_update_frequency = 5
 
@@ -39,7 +39,7 @@ class DQNAgent(object):
         self.save_epi_reward = []
         self.save_mean_q_value = []
 
-        self.stop_train = 10
+        self.stop_train = 30
     def train(self, max_episode_num):
 
         train_ep = 0
@@ -61,22 +61,20 @@ class DQNAgent(object):
             state = self.env.reset()
             state = np.reshape(state, (1, self.state_dim))
 
-            targets = deque(maxlen=self.BATCH_SIZE)
-            states = deque(maxlen=self.BATCH_SIZE)
-            actions = deque(maxlen=self.BATCH_SIZE)
-            rewards = deque(maxlen=self.BATCH_SIZE)
-            next_states = deque(maxlen=self.BATCH_SIZE)
-            dones = deque(maxlen=self.BATCH_SIZE)
+            targets = []
+            states = []
+            actions = []
 
             mean_q_value = 0
             frame = 0
+            max_position = -1.2
 
             while not done:
 
                 frame += 1
 
                 # render
-                self.env.render()
+                # self.env.render()
 
                 # get action
                 action = self.q.get_action(state)
@@ -101,48 +99,54 @@ class DQNAgent(object):
                     continue
 
                 # append 1 random sample
-                random_index = np.random.choice(len(self.replay_memory), 1)[0]
+                random_index = np.random.choice(len(self.replay_memory), self.BATCH_SIZE)
 
-                states.append((self.replay_memory[random_index][0]))
-                actions.append((self.replay_memory[random_index][1]))
-                sampled_reward = self.replay_memory[random_index][2]
-                sampled_done = self.replay_memory[random_index][4]
-                sampled_next_state = self.replay_memory[random_index][3]
+                for idx in random_index:
+                    states.append((self.replay_memory[idx][0]))
+                    actions.append((self.replay_memory[idx][1]))
+                    sampled_reward = self.replay_memory[idx][2]
+                    sampled_done = self.replay_memory[idx][4]
+                    sampled_next_state = self.replay_memory[idx][3]
 
-                # argmax action from current q
-                argmax_action = np.argmax(self.q.model(sampled_next_state)[1])
-                argmax_action = tf.one_hot(argmax_action, self.action_dim)
+                    # argmax action from current q
+                    argmax_action = np.argmax(self.q.model(sampled_next_state)[1])
+                    argmax_action = tf.one_hot(argmax_action, self.action_dim)
 
-                target_v, target_a = self.target_q.model(sampled_next_state)
-                target_q = target_v + (target_a - tf.reduce_mean(target_a))
+                    target_v, target_a = self.target_q.model(sampled_next_state)
+                    target_q = target_v + (target_a - tf.reduce_mean(target_a))
 
-                # Double dqn
-                target = sampled_done * sampled_reward \
-                         + (1 - sampled_done) * (sampled_reward + self.discount_factor
-                                                 * (np.dot(target_q, argmax_action)))
-                targets.append(target)
+                    # Double dqn
+                    target = sampled_done * sampled_reward \
+                             + (1 - sampled_done) * (sampled_reward + self.discount_factor
+                                                     * (np.dot(target_q, argmax_action)))
+                    targets.append(target)
 
                 v, a = self.q.model(state)
                 q = v + (a - tf.reduce_mean(a))
                 mean_q_value += np.mean(q)
 
-                if len(targets) == self.BATCH_SIZE:
+                # train
+                input_states = np.reshape(states, (self.BATCH_SIZE, self.state_dim))
+                input_actions = tf.one_hot(actions, self.action_dim)
+                self.q.train_on_batch(input_states, input_actions, targets)
 
-                    # train
-                    input_states = np.reshape(states, (self.BATCH_SIZE, self.state_dim))
-                    input_actions = tf.one_hot(actions, self.action_dim)
-                    self.q.train_on_batch(input_states, input_actions, targets)
+                targets = []
+                states = []
+                actions = []
 
                 state = next_state
                 episode_reward += reward
                 time += 1
 
+                if state[0,0] > max_position:
+                    max_position = state[0,0]
+
                 if done:
                     train_ep += 1
-                    end_position = state[0, 0]
-                    print('Episode: {}, Reward: {}, End Position: {:.3f}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep, episode_reward, end_position, self.q.initial_exploration, mean_q_value/frame))
+                    print('Episode: {}, Reward: {}, End Position: {:.3f}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep, episode_reward, max_position, self.q.initial_exploration, mean_q_value/frame))
                     self.save_epi_reward.append(episode_reward)
                     self.save_mean_q_value.append(mean_q_value/frame)
+                    max_position = -1.2
 
                     if train_ep % self.target_network_update_frequency == 0:
                         self.q.model.save_weights('./save_weights/mountainCar_dqn.h5')
