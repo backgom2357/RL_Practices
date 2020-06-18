@@ -1,25 +1,20 @@
 from dqn_neural_net import DQN
+from replay_memory import ReplayMemory
 import numpy as np
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from collections import deque
 import time
 
-
-
 class DQNAgent(object):
 
-    def __init__(self, env, is_test=False):
+    def __init__(self, env):
 
         # hyperparameter
-        self.BATCH_SIZE = 32
+        self.BATCH_SIZE = 64
         self.LEARNING_RATE = 0.001
-        self.replay_memory_size = 100000
-<<<<<<< HEAD
-        self.replay_start_size = 50000
-=======
-        self.replay_start_size = 1000
->>>>>>> d42896f011414169242e513a78c15b295ec70494
+        self.replay_memory_size = 50000
+        self.replay_start_size = 5000
         self.discount_factor = 0.99
         self.target_network_update_frequency = 5
 
@@ -32,8 +27,7 @@ class DQNAgent(object):
         # max position
         self.max_position = -1.2
         # replay memory with deque
-        self.replay_memory = deque(maxlen=self.replay_memory_size)
-
+        self.replay_memory = ReplayMemory(self.replay_memory_size, self.state_dim, self.action_dim)
 
         # Q function
         self.q = DQN(self.state_dim, self.action_dim, self.LEARNING_RATE)
@@ -65,10 +59,6 @@ class DQNAgent(object):
             state = self.env.reset()
             state = np.reshape(state, (1, self.state_dim))
 
-            targets = []
-            states = []
-            actions = []
-
             mean_q_value = 0
             frame = 0
             max_position = -1.2
@@ -94,68 +84,49 @@ class DQNAgent(object):
                 if next_state[0, 0] >= 0.5:
                     reward += 10
 
-                # reshape
-                self.replay_memory.append((state, action, reward, next_state, done))
+                # append sample to replay memory
+                self.replay_memory.append(state, action, reward, next_state, done)
 
                 # wait for full replay memory
-                if len(self.replay_memory) < self.replay_start_size:
+                if self.replay_memory.crt_idx < self.replay_start_size or self.replay_memory.is_full:
                     state = next_state
                     continue
 
-                # append 1 random sample
-                random_index = np.random.choice(len(self.replay_memory), self.BATCH_SIZE)
+                # sample batch
+                states, actions, rewards, next_states, dones = self.replay_memory.sample(self.BATCH_SIZE)
 
-                for idx in random_index:
-                    states.append((self.replay_memory[idx][0]))
-                    actions.append((self.replay_memory[idx][1]))
-                    sampled_reward = self.replay_memory[idx][2]
-                    sampled_done = self.replay_memory[idx][4]
-                    sampled_next_state = self.replay_memory[idx][3]
+                # argmax action from current q
+                a_next_action = self.q.model(next_states)[1]
+                argmax_action = np.argmax(a_next_action, axis=1)
+                argmax_action = tf.one_hot(argmax_action, self.action_dim)
 
-                    # argmax action from current q
-                    argmax_action = np.argmax(self.q.model(sampled_next_state)[1])
-                    argmax_action = tf.one_hot(argmax_action, self.action_dim)
+                target_vs, target_as = self.target_q.model(next_states)
+                target_qs = target_as \
+                            + (target_vs - tf.reshape(tf.reduce_mean(target_as, axis=1), shape=(len(target_as), 1)))
 
-                    target_v, target_a = self.target_q.model(sampled_next_state)
-                    target_q = target_v + (target_a - tf.reduce_mean(target_a))
-
-<<<<<<< HEAD
                 # Double dqn
-                target = sampled_reward \
-                         + (1 - sampled_done) * (self.discount_factor
-                                                 * (np.dot(target_q, argmax_action)))
-                targets.append(target)
-=======
-                    # Double dqn
-                    target = sampled_done * sampled_reward \
-                             + (1 - sampled_done) * (sampled_reward + self.discount_factor
-                                                     * (np.dot(target_q, argmax_action)))
-                    targets.append(target)
->>>>>>> d42896f011414169242e513a78c15b295ec70494
-
-                v, a = self.q.model(state)
-                q = v + (a - tf.reduce_mean(a))
-                mean_q_value += np.mean(q)
+                targets = rewards + (1 - dones) * (self.discount_factor
+                                                   * tf.reduce_sum(target_qs * argmax_action, axis=1))
 
                 # train
                 input_states = np.reshape(states, (self.BATCH_SIZE, self.state_dim))
                 input_actions = tf.one_hot(actions, self.action_dim)
                 self.q.train_on_batch(input_states, input_actions, targets)
 
-                targets = []
-                states = []
-                actions = []
+                v, a = self.q.model(state)
+                q = v + (a - tf.reduce_mean(a))
+                mean_q_value += np.mean(q)
 
                 state = next_state
                 episode_reward += reward
                 time += 1
 
-                if state[0,0] > max_position:
-                    max_position = state[0,0]
+                if state[0, 0] > max_position:
+                    max_position = state[0, 0]
 
                 if done:
                     train_ep += 1
-                    print('Episode: {}, Reward: {}, End Position: {:.3f}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep, episode_reward, max_position, self.q.initial_exploration, mean_q_value/frame))
+                    print('Episode: {}, Reward: {}, Max Position: {:.3f}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep, episode_reward, max_position, self.q.initial_exploration, mean_q_value/frame))
                     self.save_epi_reward.append(episode_reward)
                     self.save_mean_q_value.append(mean_q_value/frame)
                     max_position = -1.2
