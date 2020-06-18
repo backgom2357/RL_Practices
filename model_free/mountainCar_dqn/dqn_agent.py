@@ -38,6 +38,7 @@ class DQNAgent(object):
         self.save_mean_q_value = []
 
         self.stop_train = 30
+
     def train(self, max_episode_num):
 
         train_ep = 0
@@ -45,7 +46,6 @@ class DQNAgent(object):
 
         # repeat episode
         for e in range(int(max_episode_num)):
-        # for e in range(1):
 
             # stop train
             if stop_train_count > self.stop_train:
@@ -100,6 +100,7 @@ class DQNAgent(object):
                 argmax_action = np.argmax(a_next_action, axis=1)
                 argmax_action = tf.one_hot(argmax_action, self.action_dim)
 
+                # calculate Q(s', a')
                 target_vs, target_as = self.target_q.model(next_states)
                 target_qs = target_as \
                             + (target_vs - tf.reshape(tf.reduce_mean(target_as, axis=1), shape=(len(target_as), 1)))
@@ -132,14 +133,21 @@ class DQNAgent(object):
                     max_position = -1.2
 
                     if train_ep % self.target_network_update_frequency == 0:
-                        self.q.model.save_weights('./save_weights/mountainCar_dqn.h5')
+
                         self.target_q.model.set_weights(self.q.model.get_weights())
+
+                    if train_ep % 100 == 0:
+                        path = './save_weights/mountainCar' + '{}'.format(train_ep) + 'epi_dqn.h5'
+                        self.q.model.save_weights(path)
 
                     # stop train condition
                     if episode_reward > -200:
                         stop_train_count += 1
                     else:
                         stop_train_count = 0
+
+        np.savetxt('./save_weights/save_epi_reward.txt', self.save_epi_reward, delimiter=',')
+        np.savetxt('./save_weights/save_mean_q_value.txt', self.save_mean_q_value, delimiter=',')
 
     def test(self):
 
@@ -200,6 +208,6 @@ class DQNAgent(object):
         plt.subplot(212)
         plt.plot(self.save_mean_q_value)
 
-        plt.savefig('reward_meanQ.png')
+        plt.savefig('./save_weights/reward_meanQ.png')
 
         plt.show()
