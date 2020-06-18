@@ -2,7 +2,7 @@ import gym
 from dqn_agent import DQNAgent
 
 def main():
-    max_episode_num = 3000
+    max_episode_num = 5000
     env_name = 'MountainCar-v0'
 
     env = gym.make(env_name)
