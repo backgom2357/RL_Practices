@@ -14,8 +14,8 @@ class DQNAgent(object):
         # hyperparameter
         self.BATCH_SIZE = 32
         self.LEARNING_RATE = 0.001
-        self.replay_memory_size = 40000
-        self.replay_start_size = 5000
+        self.replay_memory_size = 100000
+        self.replay_start_size = 50000
         self.discount_factor = 0.99
         self.target_network_update_frequency = 5
 
@@ -76,7 +76,7 @@ class DQNAgent(object):
                 frame += 1
 
                 # render
-                self.env.render()
+                # self.env.render()
 
                 # get action
                 action = self.q.get_action(state)
@@ -117,8 +117,8 @@ class DQNAgent(object):
                 target_q = target_v + (target_a - tf.reduce_mean(target_a))
 
                 # Double dqn
-                target = sampled_done * sampled_reward \
-                         + (1 - sampled_done) * (sampled_reward + self.discount_factor
+                target = sampled_reward \
+                         + (1 - sampled_done) * (self.discount_factor
                                                  * (np.dot(target_q, argmax_action)))
                 targets.append(target)
 
