@@ -25,7 +25,7 @@ class ReplayMemory(object):
 
     def sample(self, batch_size):
         rd_idx = np.random.choice((1 - self.is_full)*self.crt_idx+self.is_full*self.rm_size, batch_size)
-        batch_states = self.states[rd_idx]
+        batch_states = self.states[rd_idx] # rd_idx = [1,46,55,22,12]
         batch_actions = self.actions[rd_idx]
         batch_rewards = self.rewards[rd_idx]
         batch_next_states = self.next_states[rd_idx]

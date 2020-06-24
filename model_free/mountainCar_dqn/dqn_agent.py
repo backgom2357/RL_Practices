@@ -49,7 +49,7 @@ class DQNAgent(object):
 
             # stop train
             if stop_train_count > self.stop_train:
-                self.q.save_weights('./save_weights/mountainCar_dqn.h5')
+                self.q.save_weights('./save_weights/mountainCar_final_dqn.h5')
                 print("이제 잘하네!")
                 break
 
@@ -149,7 +149,7 @@ class DQNAgent(object):
         np.savetxt('./save_weights/save_epi_reward.txt', self.save_epi_reward, delimiter=',')
         np.savetxt('./save_weights/save_mean_q_value.txt', self.save_mean_q_value, delimiter=',')
 
-    def test(self):
+    def test(self, path):
 
         train_ep = 0
 
@@ -170,7 +170,7 @@ class DQNAgent(object):
         input_states = np.reshape(states, (1, self.state_dim))
         input_actions = tf.one_hot(actions, self.action_dim)
         self.q.train_on_batch(input_states, input_actions, targets)
-        self.q.model.load_weights('./save_weights/mountainCar_dqn.h5')
+        self.q.model.load_weights(path)
 
         while not done:
 
@@ -182,7 +182,7 @@ class DQNAgent(object):
             self.env.render()
 
             # get action
-            action = self.q.get_action(state)
+            action = np.argmax(self.q.model(state)[1])
 
             # observe next state, reward
             next_state, reward, done, _ = self.env.step(action)
@@ -194,11 +194,10 @@ class DQNAgent(object):
             if done:
                 train_ep += 1
                 end_position = state[0, 0]
-                print('Episode: {}, Reward: {}, End Position: {:.3f}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep,
-                                                                                                           episode_reward,
-                                                                                                           end_position,
-                                                                                                           self.q.initial_exploration,
-                                                                                                           mean_q_value / frame))
+                print('Episode: {}, Reward: {}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep,
+                                                                                     episode_reward,
+                                                                                     self.q.initial_exploration,
+                                                                                     mean_q_value / frame))
 
     # graph episodes and rewards
     def plot_result(self):
