@@ -1,8 +1,8 @@
-from dqn_neural_net import DQN
+from neural_net import DQN
+from replay_memory import ReplayMemory
 import numpy as np
 import cv2
 import tensorflow as tf
-from collections import deque
 import matplotlib.pyplot as plt
 import time
 
@@ -17,7 +17,7 @@ class Agent(object):
         self.target_network_update_frequency = 5
         self.agent_history_length = 4
         self.replay_memory_size = 80000
-        self.replay_start_size = 40000
+        self.replay_start_size = 10000
         self.action_repeat = 4
         self.update_frequency = 4
 
@@ -27,9 +27,8 @@ class Agent(object):
         self.state_dim = env.observation_space.shape[0]
         # action dimension
         self.action_dim = env.action_space.n
-
         # replay memory
-        self.replay_memory = deque(maxlen=self.replay_memory_size)
+        self.replay_memory = ReplayMemory(self.replay_memory_size, self.frame_size, self.agent_history_length)
 
         # Q function
         self.q = DQN(self.action_dim)
@@ -39,18 +38,25 @@ class Agent(object):
         self.save_epi_reward = []
         self.save_mean_q_value = []
 
+        self.stop_train = 30
 
     def preprocess(self, frame):
-        frame = np.reshape(cv2.resize(frame, dsize=(self.frame_size, self.frame_size))[..., 0],
+        frame = np.reshape(cv2.resize(frame[0:188, 23:136, :], dsize=(self.frame_size, self.frame_size))[..., 0],
                            (1, self.frame_size, self.frame_size, 1))
         return np.array(frame, dtype=np.float32) / 255
 
     def train(self, max_episode_num):
 
         train_ep = 0
+        stop_train_count = 0
 
         # repeat episode
         for e in range(int(max_episode_num)):
+
+            if stop_train_count > self.stop_train:
+                self.q.save_weights('./save_weights/boxing_dqn.h5')
+                print("이제 잘하네!")
+                break
 
             # initialize frames, episode_reward, done
             frames, episode_reward, done = 0, 0, False
@@ -63,11 +69,6 @@ class Agent(object):
                 seq.append(self.preprocess(obs))
             seq = np.stack(seq, axis=3)
             seq = np.reshape(seq, (1, self.frame_size, self.frame_size, self.agent_history_length))
-
-            # init batches
-            targets = deque(maxlen=self.batch_size)
-            seqs = deque(maxlen=self.batch_size)
-            actions = deque(maxlen=self.batch_size)
 
             # init mean_q_value for plot
             mean_q_value = 0
@@ -86,55 +87,50 @@ class Agent(object):
                 # preprocess for next sequence
                 next_seq = np.append(self.preprocess(observation), seq[..., :3], axis=3)
                 # store transition in replay memory
-                self.replay_memory.append((seq, action, reward, next_seq, done))
-                # total reward
-                episode_reward += reward
+                self.replay_memory.append(seq, action, reward, next_seq, done)
 
                 # wait for full replay memory
-                if len(self.replay_memory) < self.replay_start_size:
+                if self.replay_memory.crt_idx < self.replay_start_size or self.replay_memory.is_full:
                     seq = next_seq
                     continue
 
-                # deque reply memory
-                random_index = np.random.choice(len(self.replay_memory), 1)[0]
-
-                seqs.append((self.replay_memory[random_index][0]))
-                actions.append((self.replay_memory[random_index][1]))
-                sampled_reward = self.replay_memory[random_index][2]
-                sampled_done = self.replay_memory[random_index][4]
-                sampled_next_seq = self.replay_memory[random_index][3]
+                # sample batch
+                seqs, actions, rewards, next_seqs, dones = self.replay_memory.sample(self.batch_size)
 
                 # argmax action from current q
-                amax_action = np.amax(self.q.model(sampled_next_seq))
-                amax_action = tf.one_hot(amax_action, self.action_dim)
+                a_next_action = self.q.model(next_seqs)[1]
+                argmax_action = np.argmax(a_next_action, axis=1)
+                argmax_action = tf.one_hot(argmax_action, self.action_dim)
 
-                target = sampled_done * sampled_reward \
-                         + (1 - sampled_done) * (sampled_reward + self.discount_factor
-                                              * (np.dot(self.target_q.model(sampled_next_seq), amax_action)))
-                targets.append(target)
+                # calculate Q(s', a')
+                target_vs, target_as = self.target_q.model(next_seqs)
+                target_qs = target_as \
+                            + (target_vs - tf.reshape(tf.reduce_mean(target_as, axis=1), shape=(len(target_as), 1)))
 
-                mean_q_value += np.mean(self.q.model(seq))
+                # Double dqn
+                targets = rewards + (1 - dones) * (self.discount_factor * tf.reduce_sum(target_qs * argmax_action, axis=1))
 
-                if len(targets) == self.batch_size:
-                    input_seqs = np.reshape(seqs,
-                                            (self.batch_size, self.frame_size, self.frame_size,
-                                             self.agent_history_length))
-                    input_actions = tf.one_hot(actions, self.action_dim)
-                    self.q.train(input_seqs, input_actions, targets)
+                # train
+                input_states = np.reshape(seqs, (self.batch_size, self.frame_size, self.frame_size, self.agent_history_length))
+                input_actions = tf.one_hot(actions, self.action_dim)
+                self.q.train(input_states, input_actions, targets)
+
+                v, a = self.q.model(seq)
+                q = v + (a - tf.reduce_mean(a))
+                mean_q_value += np.mean(q)
 
                 seq = next_seq
+                # total reward
+                episode_reward += reward
 
                 if done:
                     train_ep += 1
-
-                    self.save_epi_reward.append(episode_reward)
-                    self.save_mean_q_value.append(mean_q_value / frames)
-                    if train_ep % 40 == 0:
-                        self.test(path="./save_weights/", is_valid=True)
-                        print('Episode: {}, Reward: {}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep,
+                    print('Episode: {}, Reward: {}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep,
                                                                                          episode_reward,
                                                                                          self.q.epsilon,
                                                                                          mean_q_value / frames))
+                    self.save_epi_reward.append(episode_reward)
+                    self.save_mean_q_value.append(mean_q_value / frames)
                     if train_ep % self.target_network_update_frequency == 0:
                         self.target_q.model.set_weights(self.q.model.get_weights())
 

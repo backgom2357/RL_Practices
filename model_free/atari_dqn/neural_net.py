@@ -28,8 +28,7 @@ class DeepQNetwork(Model):
         a = self.full_connect_a(x)
         v = self.d_v(v)
         a = self.d_a(a)
-        output = v + (a - tf.reduce_mean(a))
-        return output
+        return v, a
 
 class DQN(object):
     def __init__(self, action_dim):
@@ -39,7 +38,7 @@ class DQN(object):
         self.gradient_momentum = 0.95
         self.initial_exploration = 1.0
         self.final_exploration = 0.1
-        self.final_exploration_frame = 100000
+        self.final_exploration_frame = 500000
         self.epsilon = self.initial_exploration
 
         # action dimension
@@ -58,22 +57,23 @@ class DQN(object):
             self.epsilon -= (self.initial_exploration + self.final_exploration)/self.final_exploration_frame
         # update parameters
         with tf.GradientTape() as g:
-            q_values = self.model(seqs)
+            v, a = self.model(seqs)
+            q_values = a + \
+                       (v - tf.reshape(tf.reduce_mean(a, axis=1), shape=(len(a), 1)))
             q_values_with_action = tf.reduce_sum(q_values * actions, axis=1)
             loss = self.dqn_loss(targets, q_values_with_action)
-        g_loss = g.gradient(loss, self.model.trainable_weights)
-        self.dqn_optimizer.apply_gradients(zip(g_loss, self.model.trainable_weights))
+        g_theta = g.gradient(loss, self.model.trainable_weights)
+        self.dqn_optimizer.apply_gradients(zip(g_theta, self.model.trainable_weights))
 
 
     def get_action(self, sequence, is_test = False):
         if self.epsilon >= np.random.rand() and not is_test:
             return np.random.randint(self.action_dim)
         else:
-            return np.argmax(self.model(sequence)[0])
-
+            return np.argmax(self.model(sequence)[1])
 
     def save_weights(self, path):
         self.model.save_weights(path)
 
     def load_weights(self, path):
-        self.model.load_weights(path+'dqn.h5')
+        self.model.load_weights(path+'dqn_boxing.h5')

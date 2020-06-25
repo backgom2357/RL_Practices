@@ -54,7 +54,6 @@ class DQN(object):
             v, a = self.model(states)
             q_values = a + \
                        (v - tf.reshape(tf.reduce_mean(a, axis=1), shape=(len(a), 1)))
-
             q_values_with_actions = tf.reduce_sum(q_values * actions, axis=1)
             loss = 0.5*((td_targets-q_values_with_actions)**2)
         g_theta = g.gradient(loss, self.model.trainable_weights)

@@ -1,7 +1,7 @@
 import numpy as np
 
 class ReplayMemory(object):
-    def __init__(self, replay_memory_size, state_dim, action_dim):
+    def __init__(self, replay_memory_size, state_dim):
         self.rm_size = replay_memory_size
 
         # init state, action, reward, next_state, done
@@ -25,7 +25,7 @@ class ReplayMemory(object):
 
     def sample(self, batch_size):
         rd_idx = np.random.choice((1 - self.is_full)*self.crt_idx+self.is_full*self.rm_size, batch_size)
-        batch_states = self.states[rd_idx] # rd_idx = [1,46,55,22,12]
+        batch_states = self.states[rd_idx]
         batch_actions = self.actions[rd_idx]
         batch_rewards = self.rewards[rd_idx]
         batch_next_states = self.next_states[rd_idx]

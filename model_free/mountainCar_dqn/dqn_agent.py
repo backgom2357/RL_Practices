@@ -88,7 +88,7 @@ class DQNAgent(object):
                 self.replay_memory.append(state, action, reward, next_state, done)
 
                 # wait for full replay memory
-                if self.replay_memory.crt_idx < self.replay_start_size or self.replay_memory.is_full:
+                if self.replay_memory.crt_idx < self.replay_start_size or not self.replay_memory.is_full:
                     state = next_state
                     continue
 

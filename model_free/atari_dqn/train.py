@@ -1,5 +1,5 @@
 import gym
-from dqn_agent import Agent
+from agent import Agent
 import tensorflow as tf
 
 physical_devices = tf.config.list_physical_devices('GPU')
