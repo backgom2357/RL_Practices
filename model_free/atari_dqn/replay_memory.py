@@ -3,6 +3,8 @@ import numpy as np
 class ReplayMemory(object):
     def __init__(self, replay_memory_size, frame_size, agent_history_length):
         self.replay_memory_size = replay_memory_size
+        self.frame_size = frame_size
+        self.agent_history_length = agent_history_length
 
         # init seqs, action, reward, next_seqs, done
         self.seqs = np.zeros((replay_memory_size, frame_size, frame_size, agent_history_length), dtype=np.float32)
@@ -31,3 +33,10 @@ class ReplayMemory(object):
         batch_next_seqs = self.next_seqs[rd_idx]
         batch_dones = self.dones[rd_idx]
         return batch_seqs, batch_actions, batch_rewards, batch_next_seqs, batch_dones
+
+    def reset(self):
+        self.seqs = np.zeros((self.replay_memory_size, self.frame_size, self.frame_size, self.agent_history_length), dtype=np.float32)
+        self.actions = np.zeros(self.replay_memory_size, np.uint8)
+        self.rewards = np.zeros(self.replay_memory_size, np.float32)
+        self.next_seqs = np.zeros((self.replay_memory_size, self.frame_size, self.frame_size, self.agent_history_length), dtype=np.float32)
+        self.dones = np.zeros(self.replay_memory_size, np.bool)

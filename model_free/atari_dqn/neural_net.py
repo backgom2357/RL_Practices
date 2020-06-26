@@ -38,7 +38,7 @@ class DQN(object):
         self.gradient_momentum = 0.95
         self.initial_exploration = 1.0
         self.final_exploration = 0.1
-        self.final_exploration_frame = 500000
+        self.final_exploration_frame = 100000
         self.epsilon = self.initial_exploration
 
         # action dimension
