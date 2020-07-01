@@ -14,8 +14,8 @@ class DeepQNetwork(Model):
         self.conv2 = Conv2D(64, (4, 4), 2, activation='relu')
         self.conv3 = Conv2D(64, (3, 3), 1, activation='relu')
         self.flatten = Flatten()
-        self.full_connect_v = Dense(512, activation='relu')
-        self.full_connect_a = Dense(512, activation='relu')
+        self.full_connect_v = Dense(1024, activation='relu')
+        self.full_connect_a = Dense(1024, activation='relu')
         self.d_v = Dense(1)
         self.d_a = Dense(action_dim)
 
@@ -38,7 +38,7 @@ class DQN(object):
         self.gradient_momentum = 0.95
         self.initial_exploration = 1.0
         self.final_exploration = 0.1
-        self.final_exploration_frame = 100000
+        self.final_exploration_frame = 1000000
         self.epsilon = self.initial_exploration
 
         # action dimension

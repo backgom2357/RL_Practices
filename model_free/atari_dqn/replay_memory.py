@@ -1,10 +1,12 @@
 import numpy as np
 
 class ReplayMemory(object):
-    def __init__(self, replay_memory_size, frame_size, agent_history_length):
+    def __init__(self, replay_memory_size, frame_size, agent_history_length, max_files_num):
         self.replay_memory_size = replay_memory_size
         self.frame_size = frame_size
         self.agent_history_length = agent_history_length
+        self.max_files_num = max_files_num
+        self.file_idx = 0
 
         # init seqs, action, reward, next_seqs, done
         self.seqs = np.zeros((replay_memory_size, frame_size, frame_size, agent_history_length), dtype=np.float32)
@@ -14,7 +16,7 @@ class ReplayMemory(object):
         self.dones = np.zeros(replay_memory_size, np.bool)
 
         self.crt_idx = 0
-        self.is_full = self.rewards[-1] != 0 # hope the last reward is not 0
+        self.is_full = False
 
     def append(self, seq, action, reward, next_seq, done):
         self.seqs[self.crt_idx, ...] = seq
@@ -24,6 +26,11 @@ class ReplayMemory(object):
         self.dones[self.crt_idx] = done
 
         self.crt_idx = (self.crt_idx + 1) % self.replay_memory_size
+
+        if self.crt_idx == self.replay_memory_size and self.file_idx <= self.max_files_num:
+            self.is_full = True
+            np.save('./replay_memory/r'+str(self.file_idx)+'.npy')
+            self.file_idx += 1
 
     def sample(self, batch_size):
         rd_idx = np.random.choice((1 - self.is_full)*self.crt_idx+self.is_full*self.replay_memory_size, batch_size)

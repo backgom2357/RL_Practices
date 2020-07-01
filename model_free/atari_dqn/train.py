@@ -13,7 +13,7 @@ def main():
     max_episode_num = 3000
 
     # environment
-    env_name = 'Boxing-v4'
+    env_name = 'Boxing-v0'
     env = gym.make(env_name)
 
     agent = Agent(env)

@@ -11,13 +11,11 @@ class Agent(object):
     def __init__(self, env):
 
         # hyperparameter
-        self.frame_size = 48
+        self.frame_size = 30
         self.batch_size = 32
         self.discount_factor = 0.99
         self.target_network_update_frequency = 5
         self.agent_history_length = 4
-        self.replay_memory_size = 100000
-        self.replay_start_size = 50000
         self.action_repeat = 4
         self.update_frequency = 4
 
@@ -28,7 +26,10 @@ class Agent(object):
         # action dimension
         self.action_dim = env.action_space.n
         # replay memory
-        self.replay_memory = ReplayMemory(self.replay_memory_size, self.frame_size, self.agent_history_length)
+        self.replay_memory_size = 50000
+        self.replay_start_size = 50000
+        self.max_files_num = 1000000//self.replay_memory_size
+        self.replay_memory = ReplayMemory(self.replay_memory_size, self.frame_size, self.agent_history_length, self.max_files_num)
 
         # Q function
         self.q = DQN(self.action_dim)
@@ -119,6 +120,9 @@ class Agent(object):
                     # train
                     input_states = np.reshape(seqs, (self.batch_size, self.frame_size, self.frame_size, self.agent_history_length))
                     input_actions = tf.one_hot(actions, self.action_dim)
+
+                    print(action, targets)
+
                     self.q.train(input_states, input_actions, targets)
 
                     seq = next_seq
