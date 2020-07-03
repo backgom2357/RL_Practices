@@ -17,7 +17,6 @@ class ReplayMemory(object):
         self.dones = np.zeros(replay_memory_size, np.bool)
 
         self.crt_idx = 0
-        self.is_full = False
 
     def append(self, seq, action, reward, next_seq, done):
         self.seqs[self.crt_idx, ...] = seq
@@ -29,20 +28,17 @@ class ReplayMemory(object):
         self.crt_idx += 1
 
         if self.crt_idx == self.replay_memory_size:
-            self.is_full = True
-            np.savez('./replay_data/'+str(self.file_idx)+'.npz',  
-            seqs=self.seqs, 
-            actions=self.actions,
-            rewards=self.rewards,
-            next_seqs=self.next_seqs,
-            dones=self.dones
-            )
+            np.save('./replay_data/seqs/'+str(self.file_idx)+'.npy', self.seqs) 
+            np.save('./replay_data/actions/'+str(self.file_idx)+'.npy', self.actions)
+            np.save('./replay_data/rewards/'+str(self.file_idx)+'.npy', self.rewards)
+            np.save('./replay_data/next_seqs/'+str(self.file_idx)+'.npy', self.next_seqs)
+            np.save('./replay_data/dones/'+str(self.file_idx)+'.npy', self.dones)
             self.file_idx = (self.file_idx + 1) % self.max_files_num
             self.crt_idx = 0
             self.reset()
 
     def sample(self, batch_size):
-        num_files = len(os.listdir('./replay_data/'))
+        num_files = len(os.listdir('./replay_data/seqs'))
         rd_idx = np.random.choice(num_files*self.replay_memory_size, batch_size)
         file_names = list(map(lambda x: str(x//self.replay_memory_size), rd_idx))
         idx_in_file = list(map(lambda i: i % self.replay_memory_size, rd_idx))
@@ -53,14 +49,12 @@ class ReplayMemory(object):
         batch_next_seqs = np.zeros((batch_size, self.frame_size, self.frame_size, self.agent_history_length), dtype=np.float32)
         batch_dones =np.zeros(batch_size, np.bool)
 
-        for i, file, idx in enumerate(zip(file_names, idx_in_file)):
-            tmp = np.load('./replay_data/'+file+'.npz')
-            batch_seqs[i] = tmp['seqs'][idx]
-            batch_actions[i] = tmp['actions'][idx]
-            batch_rewards[i] = tmp['rewards'][idx]
-            batch_next_seqs[i] = tmp['next_seqs'][idx]
-            batch_dones[i] = tmp['dones'][idx]
-            tmp.close()
+        for i, (file, idx) in enumerate(zip(file_names, idx_in_file)):
+            batch_seqs[i] = np.load('./replay_data/seqs'+file+'.npy')[idx]
+            batch_actions[i] = np.load('./replay_data/actions'+file+'.npy')[idx]
+            batch_rewards[i] = np.load('./replay_data/rewards'+file+'.npy')[idx]
+            batch_next_seqs[i] = np.load('./replay_data/next_seqs'+file+'.npy')[idx]
+            batch_dones[i] = np.load('./replay_data/dones'+file+'.npy')[idx]
 
         return batch_seqs, batch_actions, batch_rewards, batch_next_seqs, batch_dones
 

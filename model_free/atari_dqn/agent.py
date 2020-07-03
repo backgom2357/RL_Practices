@@ -25,12 +25,12 @@ class Agent(object):
         # state dimension
         self.state_dim = env.observation_space.shape[0]
         # action dimension
-        # self.action_dim = env.action_space.n
-        self.action_dim = 10
+        self.action_dim = env.action_space.n
+        # self.action_dim = 10
         # replay memory
-        self.replay_memory_size = 50000
-        self.replay_start_size = 50000
-        self.max_files_num = 1000000//self.replay_memory_size
+        self.replay_memory_size = 50
+        self.replay_start_size = 25000//self.replay_memory_size
+        self.max_files_num = 500000//self.replay_memory_size
         self.replay_memory = ReplayMemory(self.replay_memory_size, self.frame_size, self.agent_history_length, self.max_files_num)
 
         # Q function
@@ -52,9 +52,6 @@ class Agent(object):
 
         train_ep = 0
 
-        mean_q_value = 0
-        episode_reward = 0
-
         # repeat episode
         for e in range(episodes):
 
@@ -66,6 +63,7 @@ class Agent(object):
             # initialize frames, episode_reward, done
             repeated_action, frames, done = 0, 0, False
             sum_q_value = 0
+            episode_reward = 0
 
             # reset env and observe initial state
             initial_frame = self.env.reset()
@@ -100,14 +98,14 @@ class Agent(object):
                 self.replay_memory.append(seq, action, reward, next_seq, done)
 
                 # check what the agent see
-                # test_img = np.reshape(next_seq, (84, 84, 4))
-                # test_img = cv2.resize(test_img, dsize=(300, 300), interpolation=cv2.INTER_AREA)
-                # cv2.imshow('obs', test_img)
-                # if cv2.waitKey(25)==ord('q') or done:
-                #     cv2.destroyAllWindows()
+                test_img = np.reshape(next_seq, (84, 84, 4))
+                test_img = cv2.resize(test_img, dsize=(300, 300), interpolation=cv2.INTER_AREA)
+                cv2.imshow('obs', test_img)
+                if cv2.waitKey(25)==ord('q') or done:
+                    cv2.destroyAllWindows()
 
                 # wait for fill data in replay memory
-                if not os.listdir('./replay_data/'):
+                if len(os.listdir('./replay_data/seqs')) < self.replay_start_size:
                     seq = next_seq
                     continue
 
@@ -130,8 +128,6 @@ class Agent(object):
                 # train
                 input_states = np.reshape(seqs, (self.batch_size, self.frame_size, self.frame_size, self.agent_history_length))
                 input_actions = tf.one_hot(actions, self.action_dim)
-
-                print(action, targets)
 
                 self.q.train(input_states, input_actions, targets)
 
