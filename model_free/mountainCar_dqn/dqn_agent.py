@@ -27,7 +27,7 @@ class DQNAgent(object):
         # max position
         self.max_position = -1.2
         # replay memory with deque
-        self.replay_memory = ReplayMemory(self.replay_memory_size, self.state_dim, self.action_dim)
+        self.replay_memory = ReplayMemory(self.replay_memory_size, self.state_dim)
 
         # Q function
         self.q = DQN(self.state_dim, self.action_dim, self.LEARNING_RATE)
@@ -37,7 +37,7 @@ class DQNAgent(object):
         self.save_epi_reward = []
         self.save_mean_q_value = []
 
-        self.stop_train = 30
+        self.stop_train = 5
 
     def train(self, max_episode_num):
 
@@ -102,8 +102,7 @@ class DQNAgent(object):
 
                 # calculate Q(s', a')
                 target_vs, target_as = self.target_q.model(next_states)
-                target_qs = target_as \
-                            + (target_vs - tf.reshape(tf.reduce_mean(target_as, axis=1), shape=(len(target_as), 1)))
+                target_qs = target_as + (target_vs - tf.reshape(tf.reduce_mean(target_as, axis=1), shape=(len(target_as), 1)))
 
                 # Double dqn
                 targets = rewards + (1 - dones) * (self.discount_factor

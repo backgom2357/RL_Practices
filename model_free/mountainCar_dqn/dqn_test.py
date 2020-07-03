@@ -10,7 +10,7 @@ def main():
 
     agent = DQNAgent(env)
 
-    agent.test('./save_weights/mountainCar700epi_dqn.h5')
+    agent.test('./save_weights/mountainCar500epi_dqn.h5')
 
 if __name__ == "__main__":
     main()
