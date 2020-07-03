@@ -10,7 +10,7 @@ tf.config.experimental.set_memory_growth(
 def main():
 
     # hyperparameter
-    max_episode_num = 3000
+    max_episode_num = 2000
 
     # environment
     env_name = 'Boxing-v0'

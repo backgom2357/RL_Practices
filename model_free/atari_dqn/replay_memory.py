@@ -1,4 +1,5 @@
 import numpy as np
+import os
 
 class ReplayMemory(object):
     def __init__(self, replay_memory_size, frame_size, agent_history_length, max_files_num):
@@ -25,20 +26,42 @@ class ReplayMemory(object):
         self.next_seqs[self.crt_idx, ...] = next_seq
         self.dones[self.crt_idx] = done
 
-        self.crt_idx = (self.crt_idx + 1) % self.replay_memory_size
+        self.crt_idx += 1
 
-        if self.crt_idx == self.replay_memory_size and self.file_idx <= self.max_files_num:
+        if self.crt_idx == self.replay_memory_size:
             self.is_full = True
-            np.save('./replay_memory/r'+str(self.file_idx)+'.npy')
-            self.file_idx += 1
+            np.savez('./replay_data/'+str(self.file_idx)+'.npz',  
+            seqs=self.seqs, 
+            actions=self.actions,
+            rewards=self.rewards,
+            next_seqs=self.next_seqs,
+            dones=self.dones
+            )
+            self.file_idx = (self.file_idx + 1) % self.max_files_num
+            self.crt_idx = 0
+            self.reset()
 
     def sample(self, batch_size):
-        rd_idx = np.random.choice((1 - self.is_full)*self.crt_idx+self.is_full*self.replay_memory_size, batch_size)
-        batch_seqs = self.seqs[rd_idx]
-        batch_actions = self.actions[rd_idx]
-        batch_rewards = self.rewards[rd_idx]
-        batch_next_seqs = self.next_seqs[rd_idx]
-        batch_dones = self.dones[rd_idx]
+        num_files = len(os.listdir('./replay_data/'))
+        rd_idx = np.random.choice(num_files*self.replay_memory_size, batch_size)
+        file_names = list(map(lambda x: str(x//self.replay_memory_size), rd_idx))
+        idx_in_file = list(map(lambda i: i % self.replay_memory_size, rd_idx))
+        
+        batch_seqs = np.zeros((batch_size, self.frame_size, self.frame_size, self.agent_history_length), dtype=np.float32)
+        batch_actions = np.zeros(batch_size, np.uint8)
+        batch_rewards = np.zeros(batch_size, np.float32)
+        batch_next_seqs = np.zeros((batch_size, self.frame_size, self.frame_size, self.agent_history_length), dtype=np.float32)
+        batch_dones =np.zeros(batch_size, np.bool)
+
+        for i, file, idx in enumerate(zip(file_names, idx_in_file)):
+            tmp = np.load('./replay_data/'+file+'.npz')
+            batch_seqs[i] = tmp['seqs'][idx]
+            batch_actions[i] = tmp['actions'][idx]
+            batch_rewards[i] = tmp['rewards'][idx]
+            batch_next_seqs[i] = tmp['next_seqs'][idx]
+            batch_dones[i] = tmp['dones'][idx]
+            tmp.close()
+
         return batch_seqs, batch_actions, batch_rewards, batch_next_seqs, batch_dones
 
     def reset(self):

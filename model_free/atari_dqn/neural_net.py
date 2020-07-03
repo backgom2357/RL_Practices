@@ -66,8 +66,8 @@ class DQN(object):
         self.dqn_optimizer.apply_gradients(zip(g_theta, self.model.trainable_weights))
 
 
-    def get_action(self, sequence, is_test = False):
-        if self.epsilon >= np.random.rand() and not is_test:
+    def get_action(self, sequence):
+        if self.epsilon >= np.random.rand():
             return np.random.randint(self.action_dim)
         else:
             return np.argmax(self.model(sequence)[1])
