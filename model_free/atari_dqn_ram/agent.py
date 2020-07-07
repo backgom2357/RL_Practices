@@ -18,6 +18,7 @@ class Agent(object):
         self.target_network_update_frequency = 5
         self.agent_history_length = 4
         self.update_frequency = 4
+        self.skip_frames = 4
 
         # environment
         self.env = env
@@ -62,6 +63,7 @@ class Agent(object):
             frames, done = 0, False
             sum_q_value = 0
             episode_reward = 0
+            keep_action = 0
 
             # reset env and observe initial state
             initial_frame = self.env.reset()
@@ -80,6 +82,11 @@ class Agent(object):
                 # get action
                 action = self.q.get_action(seq)
 
+                if frames % self.skip_frames != 0:
+                   _, _, _, _ = self.env.step(keep_action)
+                    continue
+                keep_action = action
+                
                 # observe next frame
                 observation, reward, done, info = self.env.step(action)
                 # modify reward
