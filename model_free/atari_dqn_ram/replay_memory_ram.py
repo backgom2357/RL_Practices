@@ -6,13 +6,14 @@ class ReplayMemory(object):
 
         # init state, action, reward, next_state, done
         self.seqs = np.zeros((replay_memory_size, frame_size, frame_size, agent_history_length), dtype=np.float32)
-        self.rewards = np.ones(replay_memory_size, np.float32)
+        self.rewards = np.zeros(replay_memory_size, np.float32)
+        self.rewards[-1] = 777
         self.actions = np.zeros(replay_memory_size, np.uint8)
         self.next_seqs = np.zeros((replay_memory_size, frame_size, frame_size, agent_history_length), dtype=np.float32)
         self.dones = np.zeros(replay_memory_size, np.bool)
 
         self.crt_idx = 0
-        self.is_full = self.rewards[-1] != 1 # hope the last reward is not 0
+        self.is_full = self.rewards[-1] != 777 # hope the last reward is not 0
 
     def append(self, seq, action, reward, next_seq, done):
         self.seqs[self.crt_idx] = seq

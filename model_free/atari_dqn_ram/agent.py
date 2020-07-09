@@ -33,8 +33,8 @@ class Agent(object):
         self.replay_memory = ReplayMemory(self.replay_memory_size, self.frame_size, self.agent_history_length)
 
         # Q function
-        self.q = DQN(self.action_dim)
-        self.target_q = DQN(self.action_dim)
+        self.q = DQN(self.state_dim, self.action_dim, self.agent_history_length)
+        self.target_q = DQN(self.state_dim, self.action_dim, self.agent_history_length)
 
         # total reward of a episode
         self.save_epi_reward = []
@@ -78,25 +78,25 @@ class Agent(object):
 
                 frames += 1
                 # render
-                self.env.render()
+                # self.env.render()
                 # get action
                 action = self.q.get_action(seq)
 
                 if frames % self.skip_frames != 0:
-                   _, _, _, _ = self.env.step(keep_action)
+                    _, _, _, _ = self.env.step(keep_action)
                     continue
                 keep_action = action
-                
+
                 # observe next frame
                 observation, reward, done, info = self.env.step(action)
                 # modify reward
                 # 선빵치면 이기는겨
                 if reward>0 and episode_reward == 0:
-                    reward = 5
+                    reward = 1
                     done = True
                     # print("hit!")
                 elif reward<0 and episode_reward == 0:
-                    reward = -5
+                    reward = -1
                     done =True
                     # print('hit..')
                 # reward = np.clip(reward, -1, 1)
@@ -104,13 +104,6 @@ class Agent(object):
                 next_seq = np.append(self.preprocess(observation), seq[..., :3], axis=3)
                 # store transition in replay memory
                 self.replay_memory.append(seq, action, reward, next_seq, done)
-
-                # # check what the agent see
-                # test_img = np.reshape(next_seq, (84, 84, 4))
-                # test_img = cv2.resize(test_img, dsize=(300, 300), interpolation=cv2.INTER_AREA)
-                # cv2.imshow('obs', test_img)
-                # if cv2.waitKey(25)==ord('q') or done:
-                #     cv2.destroyAllWindows()
 
                 # wait for fill data in replay memory
                 if self.replay_memory.crt_idx < self.replay_start_size or self.replay_memory.is_full:
@@ -145,8 +138,6 @@ class Agent(object):
                 q = v + (a - tf.reduce_mean(a))
                 sum_q_value += np.mean(q)
 
-                print(q, end='\r')
-
                 # total reward
                 episode_reward += reward
 
@@ -162,7 +153,7 @@ class Agent(object):
                     self.save_epi_reward.append(episode_reward)
                     self.save_mean_q_value.append(mean_q_value)
 
-            if train_ep % 10 == 0:
+            if train_ep % 100 == 0:
                 self.q.save_weights('./save_weights/dqn_boxing_' + str(train_ep) + 'epi.h5')
 
         np.savetxt('.save_weights/pendulum_epi_reward.txt', self.save_epi_reward)
@@ -196,7 +187,7 @@ class Agent(object):
 
             frames += 1
             # # render
-            self.env.render()
+            # self.env.render()
             # get action
             action = np.argmax(self.q.model(seq)[1])
             # observe next frame
@@ -205,6 +196,27 @@ class Agent(object):
             next_seq = np.append(self.preprocess(observation), seq[..., :3], axis=3)
             # store transition in replay memory
             seq = next_seq
+            
+            # grad-cam 확인
+            grad_cam_model = tf.keras.models.Model([self.q.model.inputs], [self.q.model.get_layer('activation').output, self.q.model.output])
+            with tf.GradientTape() as g:
+                conv_output, pred_v, pred_a = grad_cam_model(seq)
+                pred = pred_v + (pred_a - tf.reduce_mean(pred_a))
+                grad = g.gradient(pred[:, action], conv_output)[0]
+            weights = np.mean(grad, axis=(0,1))
+            grad_cam_image=np.zeros(dtype=np.float32, shape=conv_output.shape)
+            for i, w in enumerate(weights):
+                grad_cam_image += w*conv_output[0, :, :, i]
+            grad_cam_image /= np.max(grad_cam_image)
+            # grad_cam_image = grad_cam_image.numpy()
+            test_img = grad_cam_image.numpy()
+
+            # check what the agent see
+            test_img = np.reshape(next_seq, (84, 84, 4))
+            test_img = cv2.resize(test_img, dsize=(300, 300), interpolation=cv2.INTER_AREA)
+            cv2.imshow('obs', test_img)
+            if cv2.waitKey(25)==ord('q') or done:
+                cv2.destroyAllWindows()
 
             print(action, self.q.model(seq)[1], end='\r')
 

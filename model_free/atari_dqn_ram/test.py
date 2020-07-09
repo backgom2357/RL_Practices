@@ -15,7 +15,7 @@ def main():
 
     agent = Agent(env)
 
-    agent.test('./save_weights/dqn_boxing_1500epi.h5')
+    agent.test('./save_weights/dqn_boxing_940epi.h5')
 
 if __name__ == "__main__":
     main()
