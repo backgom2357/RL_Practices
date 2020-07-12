@@ -1,1 +1,8 @@
 *.npy
+*.pyc
+*.xml
+model_free/atari_dqn_ram/.idea/*
+model_free/atari_dqn_ram/__pycache__/*
+
+model_free/atari_dqn_hdd/.idea/*
+model_free/atari_dqn_hdd/__pycache__/*
