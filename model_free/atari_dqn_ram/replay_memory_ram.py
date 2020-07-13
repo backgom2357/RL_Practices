@@ -13,7 +13,9 @@ class ReplayMemory(object):
         self.dones = np.zeros(replay_memory_size, np.bool)
 
         self.crt_idx = 0
-        self.is_full = self.rewards[-1] != 777 # hope the last reward is not 0
+
+    def is_full(self):
+        return self.rewards[-1] != 777
 
     def append(self, seq, action, reward, next_seq, done):
         self.seqs[self.crt_idx] = seq
@@ -25,7 +27,7 @@ class ReplayMemory(object):
         self.crt_idx = (self.crt_idx + 1) % self.rm_size
 
     def sample(self, batch_size):
-        rd_idx = np.random.choice((1 - self.is_full)*self.crt_idx+self.is_full*self.rm_size, batch_size)
+        rd_idx = np.random.choice((1 - self.is_full())*self.crt_idx+self.is_full()*self.rm_size, batch_size)
         batch_seqs = self.seqs[rd_idx]
         batch_actions = self.actions[rd_idx]
         batch_rewards = self.rewards[rd_idx]

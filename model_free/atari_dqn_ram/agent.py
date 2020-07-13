@@ -12,8 +12,8 @@ class Agent(object):
     def __init__(self, env):
 
         # hyperparameter
-        self.frame_size = 84
-        self.batch_size = 32
+        self.frame_size = 84 # 크기를 키우면 allocate memory problem이 난다.
+        self.batch_size = 64
         self.discount_factor = 0.99
         self.target_network_update_frequency = 5
         self.agent_history_length = 4
@@ -28,13 +28,13 @@ class Agent(object):
         # self.action_dim = env.action_space.n
         self.action_dim = 5
         # replay memory
-        self.replay_memory_size = 50000
-        self.replay_start_size = 25000
+        self.replay_memory_size = 600000
+        self.replay_start_size = 300000
         self.replay_memory = ReplayMemory(self.replay_memory_size, self.frame_size, self.agent_history_length)
 
         # Q function
-        self.q = DQN(self.state_dim, self.action_dim, self.agent_history_length)
-        self.target_q = DQN(self.state_dim, self.action_dim, self.agent_history_length)
+        self.q = DQN(self.frame_size, self.action_dim, self.agent_history_length)
+        self.target_q = DQN(self.frame_size, self.action_dim, self.agent_history_length)
 
         # total reward of a episode
         self.save_epi_reward = []
@@ -64,6 +64,7 @@ class Agent(object):
             sum_q_value = 0
             episode_reward = 0
             keep_action = 0
+            max_q_value = -999
 
             # reset env and observe initial state
             initial_frame = self.env.reset()
@@ -90,23 +91,14 @@ class Agent(object):
                 # observe next frame
                 observation, reward, done, info = self.env.step(action)
                 # modify reward
-                # 선빵치면 이기는겨
-                if reward>0 and episode_reward == 0:
-                    reward = 1
-                    done = True
-                    # print("hit!")
-                elif reward<0 and episode_reward == 0:
-                    reward = -1
-                    done =True
-                    # print('hit..')
-                # reward = np.clip(reward, -1, 1)
+                reward = np.clip(reward, -1, 1)
                 # preprocess for next sequence
                 next_seq = np.append(self.preprocess(observation), seq[..., :3], axis=3)
                 # store transition in replay memory
                 self.replay_memory.append(seq, action, reward, next_seq, done)
 
                 # wait for fill data in replay memory
-                if self.replay_memory.crt_idx < self.replay_start_size or self.replay_memory.is_full:
+                if self.replay_memory.crt_idx < self.replay_start_size and not self.replay_memory.is_full():
                     seq = next_seq
                     continue
 
@@ -114,14 +106,12 @@ class Agent(object):
                 seqs, actions, rewards, next_seqs, dones = self.replay_memory.sample(self.batch_size)
 
                 # argmax action from current q
-                a_next_action = self.q.model(next_seqs)[1]
+                a_next_action = self.q.model(next_seqs)
                 argmax_action = np.argmax(a_next_action, axis=1)
                 argmax_action = tf.one_hot(argmax_action, self.action_dim)
 
                 # calculate Q(s', a')
-                target_vs, target_as = self.target_q.model(next_seqs)
-                target_qs = target_as \
-                            + (target_vs - tf.reshape(tf.reduce_mean(target_as, axis=1), shape=(len(target_as), 1)))
+                target_qs = self.target_q.model(next_seqs)
 
                 # Double dqn
                 targets = rewards + (1 - dones) * (self.discount_factor * tf.reduce_sum(target_qs * argmax_action, axis=1))
@@ -134,8 +124,9 @@ class Agent(object):
 
                 seq = next_seq
 
-                v, a = self.q.model(seq)
-                q = v + (a - tf.reduce_mean(a))
+                q = self.q.model(seq)
+                if max_q_value < np.amax(q):
+                    max_q_value = np.amax(q)
                 sum_q_value += np.mean(q)
 
                 # total reward
@@ -143,21 +134,26 @@ class Agent(object):
 
                 if done:
                     train_ep += 1
-                    mean_q_value = sum_q_value / frames
+                    mean_q_value = sum_q_value / frames * 4
                     if train_ep % self.target_network_update_frequency == 0:
                         self.target_q.model.set_weights(self.q.model.get_weights())
-                    print('episode: {}, Reward: {}, Epsilon: {:.5f}, Q-value: {}'.format(train_ep,
-                                                                                        episode_reward,
-                                                                                        self.q.epsilon,
-                                                                                        mean_q_value))
+                    crt_buffer_idx = self.replay_memory.crt_idx
+                    if self.replay_memory.is_full():
+                        crt_buffer_idx = 'full'
+                    print('episode: {}, Reward: {}, Epsilon: {:.5f}, buffer size: {}, max Q-value: {:.3f} Q-value: {:.2f}'.format(train_ep,
+                                                                                                                            episode_reward,
+                                                                                                                            self.q.epsilon,
+                                                                                                                            crt_buffer_idx,
+                                                                                                                            max_q_value,
+                                                                                                                            mean_q_value))
                     self.save_epi_reward.append(episode_reward)
                     self.save_mean_q_value.append(mean_q_value)
 
             if train_ep % 100 == 0:
-                self.q.save_weights('./save_weights/dqn_boxing_' + str(train_ep) + 'epi.h5')
+                self.q.save_weights('/home/ubuntu/RL_Practices/model_free/atari_dqn_ram/save_weights/dqn_boxing_' + str(train_ep) + 'epi.h5')
 
-        np.savetxt('.save_weights/pendulum_epi_reward.txt', self.save_epi_reward)
-        np.savetxt('.save_weights/pendulum_epi_reward.txt', self.save_mean_q_value)
+        np.savetxt('/home/ubuntu/RL_Practices/model_free/atari_dqn_ram/save_weights/pendulum_epi_reward.txt', self.save_epi_reward)
+        np.savetxt('/home/ubuntu/RL_Practices/model_free/atari_dqn_ram/save_weights/pendulum_epi_reward.txt', self.save_mean_q_value)
 
 
     def test(self, path):
@@ -189,27 +185,13 @@ class Agent(object):
             # # render
             # self.env.render()
             # get action
-            action = np.argmax(self.q.model(seq)[1])
+            action = np.argmax(self.q.model(seq)[0])
             # observe next frame
             observation, reward, done, info = self.env.step(action)
             # preprocess for next sequence
             next_seq = np.append(self.preprocess(observation), seq[..., :3], axis=3)
             # store transition in replay memory
             seq = next_seq
-            
-            # grad-cam 확인
-            grad_cam_model = tf.keras.models.Model([self.q.model.inputs], [self.q.model.get_layer('activation').output, self.q.model.output])
-            with tf.GradientTape() as g:
-                conv_output, pred_v, pred_a = grad_cam_model(seq)
-                pred = pred_v + (pred_a - tf.reduce_mean(pred_a))
-                grad = g.gradient(pred[:, action], conv_output)[0]
-            weights = np.mean(grad, axis=(0,1))
-            grad_cam_image=np.zeros(dtype=np.float32, shape=conv_output.shape)
-            for i, w in enumerate(weights):
-                grad_cam_image += w*conv_output[0, :, :, i]
-            grad_cam_image /= np.max(grad_cam_image)
-            # grad_cam_image = grad_cam_image.numpy()
-            test_img = grad_cam_image.numpy()
 
             # check what the agent see
             test_img = np.reshape(next_seq, (84, 84, 4))
