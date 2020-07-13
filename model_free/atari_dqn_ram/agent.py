@@ -26,7 +26,7 @@ class Agent(object):
         self.state_dim = env.observation_space.shape[0]
         # action dimension
         # self.action_dim = env.action_space.n
-        self.action_dim = 5
+        self.action_dim = 6
         # replay memory
         self.replay_memory_size = 600000
         self.replay_start_size = 300000

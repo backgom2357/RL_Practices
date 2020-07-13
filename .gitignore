@@ -6,3 +6,6 @@ model_free/atari_dqn_ram/__pycache__/*
 
 model_free/atari_dqn_hdd/.idea/*
 model_free/atari_dqn_hdd/__pycache__/*
+model_free/atari_dqn_ram/__pycache__/
+
+model_free/atari_dqn_ram/save_weights/dqn_boxing_1200epi.h5

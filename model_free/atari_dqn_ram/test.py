@@ -64,9 +64,7 @@ def main():
             cv2.destroyAllWindows()
 
         print(action, model(seq)[0], end='\r')
-     
 
-    agent.test('./save_weights/dqn_boxing_1200epi.h5')
 
 if __name__ == "__main__":
     main()

@@ -37,7 +37,6 @@ class DQN(object):
         full_connect_a = Dense(512, activation='relu')(flatten)
         d_v = Dense(1)(full_connect_v)
         d_a = Dense(action_dim)(full_connect_a)
-        print(d_v.shape, d_a.shape)
         output = d_a + (d_v - tf.reduce_mean(d_a))
         model = Model(inputs=inputs, outputs=output)
         return model
