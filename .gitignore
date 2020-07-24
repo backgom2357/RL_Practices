@@ -1,6 +1,7 @@
 *.npy
 *.pyc
 *.xml
+*.h5
 model_free/atari_dqn_ram/.idea/*
 model_free/atari_dqn_ram/__pycache__/*
 
