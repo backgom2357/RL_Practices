@@ -1,16 +1,8 @@
-class Config:
-    def __init__(self, env):
-        
+class Config():
+    def __init__(self):
         """
         hyperparameters
         """
-        # environment
-        self.env = env
-        # state dimension
-        self.state_dim = env.observation_space.shape[0]
-        # action dimension
-        self.action_dim = env.action_space.n
-
         self.learning_rate = 0.00025
         self.gradient_momentum = 0.95
         self.initial_exploration = 1.0
@@ -23,7 +15,7 @@ class Config:
         self.frame_size = 84 # 크기를 키우면 allocate memory problem이 난다.
         self.batch_size = 34
         self.discount_factor = 0.99
-        self.target_network_update_frequency = 5
+        self.target_network_update_frequency = 7
         self.agent_history_length = 4
         self.update_frequency = 4
         self.skip_frames = 4

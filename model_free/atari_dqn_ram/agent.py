@@ -5,16 +5,20 @@ from utils import preprocess
 import numpy as np
 import cv2
 import tensorflow as tf
-import matplotlib.pyplot as plt
-import time
 import os
 import wandb
-wandb.init(project="dqn-pong")
+wandb.init(project="dqn-atari-breakout")
 
 class Agent(Config):
 
     def __init__(self, env, state_dim, action_dim):
-        super().__init__(env, state_dim, action_dim)
+        super().__init__()
+
+        # Environment
+        self.env = env
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+
         # Replay_memory
         self.replay_memory = ReplayMemory(self.replay_memory_size, self.frame_size, self.agent_history_length)
 
@@ -135,17 +139,17 @@ class Agent(Config):
                     train_ep += 1
                     mean_q_value = sum_q_value / frames * 4
                     if train_ep % self.target_network_update_frequency == 0:
-                        self.target_q.model.set_weights(self.q.model.get_weights())
+                        self.target_q.set_weights(self.q.get_weights())
                     crt_buffer_idx = self.replay_memory.crt_idx
                     if self.replay_memory.is_full():
                         crt_buffer_idx = 'full'
                     print('episode: {}, Reward: {}, Epsilon: {:.5f}, buffer size: {}, max Q-value: {:.3f} Q-value: {:.2f}'.format(train_ep,
                                                                                                                             episode_reward,
-                                                                                                                            self.q.epsilon,
+                                                                                                                            self.epsilon,
                                                                                                                             crt_buffer_idx,
                                                                                                                             max_q_value,
                                                                                                                             mean_q_value))
                     wandb.log({'Reward':episode_reward, 'Q value':mean_q_value})
 
             if train_ep % 500 == 0:
-                self.q.save_weights('/home/ubuntu/RL_Practices/model_free/atari_dqn_ram/save_weights/dqn_pong_' + str(train_ep) + 'epi.h5')
+                self.q.save_weights('/home/ubuntu/RL_Practices/model_free/atari_dqn_ram/save_weights/dqn_breakout_' + str(train_ep) + 'epi.h5')

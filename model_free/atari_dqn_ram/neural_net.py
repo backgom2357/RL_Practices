@@ -11,5 +11,5 @@ def build_model(frame_size, action_dim, agent_history_length):
     flatten = Flatten()(conv3)
     d1 = Dense(512, activation='relu')(flatten)
     d2 = Dense(action_dim)(d1)
-    model = Model(inputs=inputs, outputs=d2.output)
+    model = Model(inputs=inputs, outputs=d2)
     return model
