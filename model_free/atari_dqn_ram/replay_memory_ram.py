@@ -5,11 +5,11 @@ class ReplayMemory(object):
         self.rm_size = replay_memory_size
 
         # init state, action, reward, next_state, done
-        self.seqs = np.zeros((replay_memory_size, frame_size, frame_size, agent_history_length), dtype=np.float32)
+        self.seqs = np.zeros((replay_memory_size, frame_size, frame_size, agent_history_length), dtype=np.uint8)
         self.rewards = np.zeros(replay_memory_size, np.float32)
         self.rewards[-1] = 777
         self.actions = np.zeros(replay_memory_size, np.uint8)
-        self.next_seqs = np.zeros((replay_memory_size, frame_size, frame_size, agent_history_length), dtype=np.float32)
+        self.next_seqs = np.zeros((replay_memory_size, frame_size, frame_size, agent_history_length), dtype=np.uint8)
         self.dones = np.zeros(replay_memory_size, np.bool)
 
         self.crt_idx = 0

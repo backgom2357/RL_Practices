@@ -1,13 +1,13 @@
 from neural_net import build_model
 from replay_memory_ram import ReplayMemory
 from config import Config
-from utils import preprocess
+from utils import *
 import numpy as np
 import cv2
 import tensorflow as tf
 import os
 import wandb
-wandb.init(project="dqn-atari-breakout")
+wandb.init(project="dqn-atari-boxing")
 
 class Agent(Config):
 
@@ -27,7 +27,7 @@ class Agent(Config):
         self.target_q = build_model(self.frame_size, self.action_dim, self.agent_history_length)
         
         # Complie
-        self.optimizer=tf.keras.optimizers.RMSprop(learning_rate=self.learning_rate, momentum=self.gradient_momentum, clipnorm=10.)
+        self.optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate, clipnorm=10.)
         self.loss = tf.keras.losses.MeanSquaredError()
         self.q.summary()
 
@@ -37,16 +37,36 @@ class Agent(Config):
         else:
             return np.argmax(self.q(sequence)[0])
 
-    def model_train(self, predicts, targets):
-        model_params = self.q.trainable_variables
+    def model_train(self):
+        """
+        Train Q
+        """
+        # sample batch
+        seqs, actions, rewards, next_seqs, dones = self.replay_memory.sample(self.batch_size)
+
         # epsilon decay
         if self.epsilon > self.final_exploration:
             self.epsilon -= (self.initial_exploration + self.final_exploration)/self.final_exploration_frame
         # update parameters
         with tf.GradientTape() as g:
+            # argmax action from current q
+            a_next_action = self.q(normalize(next_seqs))
+            argmax_action = np.argmax(a_next_action, axis=1)
+            argmax_action = tf.one_hot(argmax_action, self.action_dim)
+
+            # calculate Q(s', a')
+            target_qs = self.target_q(normalize(next_seqs))
+
+            # Double dqn
+            targets = rewards + (1 - dones) * (self.discount_factor * tf.reduce_sum(target_qs * argmax_action, axis=1))
+
+            predicts = self.q(normalize(seqs))
+            train_actions = tf.one_hot(actions, self.action_dim)
+            predicts = tf.reduce_sum(predicts * train_actions, axis=1)
             loss = self.loss(targets, predicts)
-        g_theta = g.gradient(loss, model_params)
-        self.optimizer.apply_gradients(zip(g_theta, model_params))
+
+        g_theta = g.gradient(loss, self.q.trainable_weights)
+        self.optimizer.apply_gradients(zip(g_theta, self.q.trainable_weights))
 
     def train(self, episodes):
 
@@ -64,10 +84,10 @@ class Agent(Config):
 
             # reset env and observe initial state
             initial_frame = self.env.reset()
-            seq = [preprocess(initial_frame, crop=(0,188,23,136), frame_size=self.frame_size)]
+            seq = [preprocess(initial_frame, crop=(0,210,0,160), frame_size=self.frame_size)]
             for _ in range(self.agent_history_length-1):
                 obs, _, _, _ = self.env.step(0)
-                seq.append(preprocess(obs, crop=(0,188,23,136), frame_size=self.frame_size))
+                seq.append(preprocess(obs, crop=(0,210,0,160), frame_size=self.frame_size))
             seq = np.stack(seq, axis=3)
             seq = np.reshape(seq, (1, self.frame_size, self.frame_size, self.agent_history_length))
 
@@ -79,7 +99,7 @@ class Agent(Config):
                 # self.env.render()
 
                 # get action
-                action = self.get_action(seq)
+                action = self.get_action(normalize(seq))
 
                 if frames % self.skip_frames != 0:
                     _, _, _, _ = self.env.step(keep_action)
@@ -91,7 +111,7 @@ class Agent(Config):
                 # modify reward
                 reward = np.clip(reward, -1, 1)
                 # preprocess for next sequence
-                next_seq = np.append(preprocess(observation), seq[..., :3], axis=3)
+                next_seq = np.append(preprocess(observation, crop=(0,210,0,160), frame_size=self.frame_size), seq[..., :3], axis=3)
                 # store transition in replay memory
                 self.replay_memory.append(seq, action, reward, next_seq, done)
 
@@ -100,34 +120,13 @@ class Agent(Config):
                     seq = next_seq
                     continue
 
-                """
-                Train Q
-                """
-                # sample batch
-                seqs, actions, rewards, next_seqs, dones = self.replay_memory.sample(self.batch_size)
-
-                # argmax action from current q
-                a_next_action = self.q(next_seqs)
-                argmax_action = np.argmax(a_next_action, axis=1)
-                argmax_action = tf.one_hot(argmax_action, self.action_dim)
-
-                # calculate Q(s', a')
-                target_qs = self.target_q(next_seqs)
-
-                # Double dqn
-                targets = rewards + (1 - dones) * (self.discount_factor * tf.reduce_sum(target_qs * argmax_action, axis=1))
-
-                # seqs for train
-                train_seqs = np.reshape(seqs, (self.batch_size, self.frame_size, self.frame_size, self.agent_history_length))
-                train_actions = tf.one_hot(actions, self.action_dim)
-                predicts = tf.reduce_sum(train_seqs * train_actions, axis=1)
-
-                self.model_train(predicts, targets)
+                # train
+                self.model_train()
 
                 seq = next_seq
                 
                 # For logs
-                q = self.q(seq)
+                q = self.q(normalize(seq))
                 if max_q_value < np.amax(q):
                     max_q_value = np.amax(q)
                 sum_q_value += np.mean(q)
@@ -143,13 +142,14 @@ class Agent(Config):
                     crt_buffer_idx = self.replay_memory.crt_idx
                     if self.replay_memory.is_full():
                         crt_buffer_idx = 'full'
+                    print(self.replay_memory.crt_idx, self.replay_memory.is_full())
                     print('episode: {}, Reward: {}, Epsilon: {:.5f}, buffer size: {}, max Q-value: {:.3f} Q-value: {:.2f}'.format(train_ep,
                                                                                                                             episode_reward,
                                                                                                                             self.epsilon,
                                                                                                                             crt_buffer_idx,
                                                                                                                             max_q_value,
                                                                                                                             mean_q_value))
-                    wandb.log({'Reward':episode_reward, 'Q value':mean_q_value})
+                    wandb.log({'Reward':episode_reward, 'Q value':mean_q_value, 'Max Q value': max_q_value})
 
             if train_ep % 500 == 0:
-                self.q.save_weights('/home/ubuntu/RL_Practices/model_free/atari_dqn_ram/save_weights/dqn_breakout_' + str(train_ep) + 'epi.h5')
+                self.q.save_weights('/home/ubuntu/RL_Practices/model_free/atari_dqn_ram/save_weights/dqn_boxing_' + str(train_ep) + 'epi.h5')
