@@ -121,7 +121,7 @@ class Agent(Config):
 
                 if done:
                     train_ep += 1
-                    mean_q_value = sum_q_value / frames * 4
+                    mean_q_value = sum_q_value / frames
                     if train_ep % self.target_network_update_frequency == 0:
                         self.target_q.set_weights(self.q.get_weights())
                     crt_buffer_idx = self.replay_memory.crt_idx

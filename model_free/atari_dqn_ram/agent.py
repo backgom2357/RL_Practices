@@ -6,8 +6,8 @@ import numpy as np
 import cv2
 import tensorflow as tf
 import os
-import wandb
-wandb.init(project="dqn-atari-boxing")
+# import wandb
+# wandb.init(project="dqn-atari-boxing")
 
 class Agent(Config):
 
@@ -149,7 +149,7 @@ class Agent(Config):
                                                                                                                             crt_buffer_idx,
                                                                                                                             max_q_value,
                                                                                                                             mean_q_value))
-                    wandb.log({'Reward':episode_reward, 'Q value':mean_q_value, 'Max Q value': max_q_value})
+                    # wandb.log({'Reward':episode_reward, 'Q value':mean_q_value, 'Max Q value': max_q_value})
 
             if train_ep % 500 == 0:
                 self.q.save_weights('/home/ubuntu/RL_Practices/model_free/atari_dqn_ram/save_weights/dqn_boxing_' + str(train_ep) + 'epi.h5')
