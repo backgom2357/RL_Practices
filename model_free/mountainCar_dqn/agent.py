@@ -1,4 +1,4 @@
-from neural_net import build_model
+from neural_net import *
 from replay_memory_ram import ReplayMemory
 from config import Config
 from utils import *
@@ -20,8 +20,8 @@ class Agent(Config):
         self.replay_memory = ReplayMemory(self.replay_memory_size, self.state_dim)
 
         # Q function
-        self.q = build_model(self.state_dim, self.action_dim)
-        self.target_q = build_model(self.state_dim, self.action_dim)
+        self.q = build_duel_dqn_model(self.state_dim, self.action_dim)
+        self.target_q = build_duel_dqn_model(self.state_dim, self.action_dim)
         
         # Complie
         self.optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate, clipnorm=10.)
@@ -123,7 +123,9 @@ class Agent(Config):
                     train_ep += 1
                     mean_q_value = sum_q_value / frames
                     if train_ep % self.target_network_update_frequency == 0:
-                        self.target_q.set_weights(self.q.get_weights())
+                        # soft target q update
+                        self.target_q.set_weights(self.tau*np.array(self.target_q.get_weights())+(1-self.tau)*np.array(self.q.get_weights()))
+                    #     self.target_q.set_weights(self.q.get_weights())
                     crt_buffer_idx = self.replay_memory.crt_idx
                     if self.replay_memory.is_full():
                         crt_buffer_idx = 'full'

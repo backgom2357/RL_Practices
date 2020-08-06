@@ -19,3 +19,8 @@ class Config():
         self.agent_history_length = 4
         self.update_frequency = 4
         self.skip_frames = 4
+
+        self.ATARI_GAMES={
+            0:'BreakoutDeterministic-v4',
+            1:'BoxingDeterministic-v4'
+        }
